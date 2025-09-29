@@ -26,6 +26,7 @@ where
         radii: cbrt(sim.m),
         scale: 1.0,
         speed: 1.0,
+        colors: [[0.7, 0.5, 0.2, 0.7]; N],
     };
 
     let mut events = Events::new(EventSettings::new());

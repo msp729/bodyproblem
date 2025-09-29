@@ -17,6 +17,7 @@ where
     pub(crate) radii: Simd<f64, N>,
     pub(crate) scale: f64,
     pub(crate) speed: f64,
+    pub(crate) colors: [[f32; 4]; N],
 }
 
 const BG: [f32; 4] = [0.1, 0.1, 0.1, 0.0];
@@ -50,18 +51,16 @@ where
                 let Body { x, y, .. } = self.sim.body(i);
 
                 let r = self.radii[i];
-                ellipse(
-                    [0.8, 0.6, 0.3, 0.8],
-                    [x - r, y - r, 2.0 * r, 2.0 * r],
-                    tr,
-                    gl,
-                );
+                ellipse(self.colors[i], [x - r, y - r, 2.0 * r, 2.0 * r], tr, gl);
             }
         });
     }
 
     pub fn update(&mut self, args: UpdateArgs) {
         self.sim = superstep(self.sim, DT(self.speed * args.dt), 10);
+        for i in 0..N {
+            self.colors[i] = hueshift(self.colors[i], ((i + 1) as f32).sqrt() / 10000.0);
+        }
     }
 
     pub fn handle(&mut self, inp: &Input) {
@@ -107,4 +106,52 @@ where
             d={amd:+.4}"
         );
     }
+}
+
+type M3 = [[f32; 3]; 3];
+
+fn rot(theta: f32) -> M3 {
+    let c = theta.cos();
+    let mc = 1. - c;
+    let s = theta.sin();
+    [
+        [
+            c + mc / 3.0,
+            mc / 3. + s / 3f32.sqrt(),
+            mc / 3. - s / 3f32.sqrt(),
+        ],
+        [
+            mc / 3. - s / 3f32.sqrt(),
+            c + mc / 3.,
+            mc / 3. + s / 3f32.sqrt(),
+        ],
+        [
+            mc / 3. + s / 3f32.sqrt(),
+            mc / 3. - s / 3f32.sqrt(),
+            c + mc / 3.,
+        ],
+    ]
+}
+
+fn add(x: [f32; 3], y: [f32; 3]) -> [f32; 3] {
+    [x[0] + y[0], x[1] + y[1], x[2] + y[2]]
+}
+
+fn scale(x: f32, y: [f32; 3]) -> [f32; 3] {
+    y.map(|z| x * z)
+}
+
+fn app(m: M3, v: [f32; 3]) -> [f32; 3] {
+    add(scale(v[0], m[0]), add(scale(v[1], m[1]), scale(v[2], m[2])))
+}
+
+fn hueshift(c: [f32; 4], theta: f32) -> [f32; 4] {
+    let rgb = [c[0], c[1], c[2]];
+    let rgb = app(rot(theta), rgb);
+    [
+        rgb[0].clamp(0.0, 1.0),
+        rgb[1].clamp(0.0, 1.0),
+        rgb[2].clamp(0.0, 1.0),
+        c[3],
+    ]
 }
