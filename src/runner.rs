@@ -1,4 +1,4 @@
-use std::simd::{LaneCount, Simd, StdFloat, SupportedLaneCount, num::SimdFloat};
+use std::simd::{LaneCount, Simd, SupportedLaneCount};
 
 use glutin_window::{GlutinWindow as Window, OpenGL};
 use opengl_graphics::GlGraphics;
@@ -6,7 +6,7 @@ use piston::{Event, EventSettings, Events, RenderEvent, UpdateEvent, WindowSetti
 
 use crate::{drawing::App, sim::Bodies};
 
-pub fn run<const N: usize>(sim: Bodies<N>)
+pub fn run<const N: usize>((sim, radii): (Bodies<N>, Simd<f64, N>))
 where
     LaneCount<N>: SupportedLaneCount,
 {
@@ -23,7 +23,7 @@ where
     let mut app = App {
         gl: GlGraphics::new(opengl),
         sim,
-        radii: cbrt(sim.m),
+        radii,
         scale: 1.0,
         speed: 1.0,
         colors: [[0.7, 0.5, 0.2, 0.7]; N],
@@ -43,14 +43,4 @@ where
             app.handle(&input);
         }
     }
-}
-
-fn cbrt<const N: usize>(s: Simd<f64, N>) -> Simd<f64, N>
-where
-    LaneCount<N>: SupportedLaneCount,
-{
-    let logs = s.abs().ln();
-    let cbrtlogs = logs / Simd::splat(3.0);
-    let cbrts = cbrtlogs.exp();
-    cbrts * s / s.abs()
 }

@@ -1,4 +1,4 @@
-use std::simd::{LaneCount, Simd, SupportedLaneCount, num::SimdFloat};
+use std::simd::{LaneCount, Simd, StdFloat, SupportedLaneCount, num::SimdFloat};
 
 use opengl_graphics::GlGraphics;
 use piston::{
@@ -36,9 +36,10 @@ where
             // Clear the screen.
             clear(BG, gl);
 
-            let xmax = self.sim.x.abs().reduce_max();
-            let ymax = self.sim.y.abs().reduce_max();
-            let maxdim = xmax.max(ymax) + self.radii.reduce_max();
+            let r = (self.sim.x * self.sim.x + self.sim.y * self.sim.y)
+                .sqrt()
+                .reduce_max();
+            let maxdim = r + self.radii.reduce_max();
             let s = s / maxdim;
 
             let tr = c
