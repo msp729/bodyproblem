@@ -73,6 +73,13 @@ where
         )
     }
 
+    pub fn momentum(self) -> (f64, f64) {
+        (
+            (self.vx * self.m).reduce_sum(),
+            (self.vy * self.m).reduce_sum(),
+        )
+    }
+
     pub fn tam(self, x0: f64, y0: f64) -> f64 {
         let dx = self.x - Simd::splat(x0);
         let dy = self.y - Simd::splat(y0);

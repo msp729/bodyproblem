@@ -92,14 +92,16 @@ where
     fn show(&self) {
         let (x, y) = self.sim.com();
         let e = energy(self.sim);
+        let (px, py) = self.sim.momentum();
         let am0 = self.sim.tam(0.0, 0.0);
         let aml = self.sim.tam(-1.0, 0.0);
         let amr = self.sim.tam(1.0, 0.0);
         let amu = self.sim.tam(0.0, 1.0);
         let amd = self.sim.tam(0.0, -1.0);
         println!(
-            "E={e:+.8}\t\
+            "E={e:+.6}\t\
             x=({x:+.4},{y:+.4})\t\
+            p=({px:+.4},{py:+.4}))\t\
             L:0={am0:+.4},\
             l={aml:+.4},\
             r={amr:+.4},\
