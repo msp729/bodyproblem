@@ -82,7 +82,7 @@ where
         match (button, state) {
             (Keyboard(Key::Space), piston::ButtonState::Press) => self.speed = 1.0 - self.speed,
             (Keyboard(Key::Return), piston::ButtonState::Press) => self.show(),
-            (Keyboard(Key::Plus), piston::ButtonState::Press) => self.scale *= 2.0,
+            (Keyboard(Key::Plus | Key::Equals), piston::ButtonState::Press) => self.scale *= 2.0,
             (Keyboard(Key::Minus), piston::ButtonState::Press) => self.scale /= 2.0,
             _ => (),
         }
