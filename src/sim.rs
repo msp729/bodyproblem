@@ -1,5 +1,5 @@
 use std::{
-    ops::{Add, Div, Index, Mul, Neg},
+    ops::{Add, Div, Mul, Neg},
     simd::{LaneCount, Simd, StdFloat, SupportedLaneCount, num::SimdFloat},
 };
 
@@ -23,7 +23,7 @@ where
     pub y: Simd<f64, N>,
     pub vx: Simd<f64, N>,
     pub vy: Simd<f64, N>,
-    pub masses: Simd<f64, N>,
+    pub m: Simd<f64, N>,
     /// universal gravitational constant, G.
     /// In the real world, it's about 6.67e-11.
     pub big_g: f64,
@@ -40,6 +40,18 @@ where
     pub vy: Simd<f64, N>,
 }
 
+impl Body {
+    pub fn fromparams(params: &[f64]) -> Self {
+        Self {
+            x: params[0],
+            y: params[1],
+            vx: params[2],
+            vy: params[3],
+            m: params[4],
+        }
+    }
+}
+
 impl<const N: usize> Bodies<N>
 where
     LaneCount<N>: SupportedLaneCount,
@@ -50,7 +62,7 @@ where
             y: self.y[i],
             vx: self.vx[i],
             vy: self.vy[i],
-            m: self.masses[i],
+            m: self.m[i],
         }
     }
 
@@ -65,7 +77,7 @@ where
         let dx = self.x - Simd::splat(x0);
         let dy = self.y - Simd::splat(y0);
         // L = m * (r.y * v.x - r.x * v.y);
-        let ang_p = self.masses * (dx * self.vy - dy * self.vx);
+        let ang_p = self.m * (dx * self.vy - dy * self.vx);
         ang_p.reduce_sum()
     }
 }
@@ -94,10 +106,10 @@ where
 
     fn mul(self, rhs: u8) -> Self::Output {
         Self {
-            x: self.x * Simd::splat(rhs as f64),
-            y: self.y * Simd::splat(rhs as f64),
-            vx: self.vx * Simd::splat(rhs as f64),
-            vy: self.vy * Simd::splat(rhs as f64),
+            x: self.x * Simd::splat(f64::from(rhs)),
+            y: self.y * Simd::splat(f64::from(rhs)),
+            vx: self.vx * Simd::splat(f64::from(rhs)),
+            vy: self.vy * Simd::splat(f64::from(rhs)),
         }
     }
 }
@@ -159,7 +171,7 @@ impl Div<i8> for DT {
     type Output = Self;
 
     fn div(self, rhs: i8) -> Self::Output {
-        Self(self.0 / rhs as f64)
+        Self(self.0 / f64::from(rhs))
     }
 }
 
@@ -171,7 +183,7 @@ where
     for i in 0..N {
         let dx = bodies.x - Simd::splat(bodies.x[i]);
         let dy = bodies.y - Simd::splat(bodies.y[i]);
-        let massprod = bodies.masses * Simd::splat(bodies.big_g * bodies.masses[i]);
+        let massprod = bodies.m * Simd::splat(bodies.big_g * bodies.m[i]);
         let r = (dx * dx + dy * dy).sqrt();
         let coe = massprod / (r * r * r);
         let fx = dx * coe;
@@ -195,24 +207,9 @@ where
     BodiesDelta {
         x: bodies.vx,
         y: bodies.vy,
-        vx: Simd::from(vx) / bodies.masses,
-        vy: Simd::from(vy) / bodies.masses,
+        vx: Simd::from(vx) / bodies.m,
+        vy: Simd::from(vy) / bodies.m,
     }
-}
-
-pub fn showconf<const N: usize>(bodies: Bodies<N>)
-where
-    LaneCount<N>: SupportedLaneCount,
-{
-    let (fx, fy) = gravity(bodies);
-
-    for i in 0..fx.len() {
-        println!(
-            "Planet {i} at ({:+.3}, {:+.3}), v=({:+.3}, {:+.3}), m={:+.3}, F=({:+.3}, {:+.3})",
-            bodies.x[i], bodies.y[i], bodies.vx[i], bodies.vy[i], bodies.masses[i], fx[i], fy[i]
-        )
-    }
-    println!("Total configuration energy: {}", energy(bodies));
 }
 
 pub fn energy<const N: usize>(bodies: Bodies<N>) -> f64
@@ -223,12 +220,12 @@ where
     // K=Σmv²/2
     // V=Σ-GMm/r
     let vsq = bodies.vx * bodies.vx + bodies.vy * bodies.vy;
-    let kinetics = bodies.masses * vsq / Simd::splat(2.0);
+    let kinetics = bodies.m * vsq / Simd::splat(2.0);
     let mut total = kinetics.reduce_sum();
     for i in 0..N {
         let dx = bodies.x - Simd::splat(bodies.x[i]);
         let dy = bodies.y - Simd::splat(bodies.y[i]);
-        let massprod = bodies.masses * Simd::splat(bodies.big_g * bodies.masses[i]);
+        let massprod = bodies.m * Simd::splat(bodies.big_g * bodies.m[i]);
         let r = (dx * dx + dy * dy).sqrt();
         let potentials = -massprod / r;
         for j in 0..i {
@@ -242,15 +239,15 @@ pub fn energy_gradient<const N: usize>(bodies: Bodies<N>) -> BodiesDelta<N>
 where
     LaneCount<N>: SupportedLaneCount,
 {
-    let (e_x, e_y) = gravity(bodies);
-    let e_vx = bodies.masses * bodies.vx;
-    let e_vy = bodies.masses * bodies.vy;
+    let (f_x, f_y) = gravity(bodies);
+    let p_x = bodies.m * bodies.vx;
+    let p_y = bodies.m * bodies.vy;
     // dE/dx = F_x
     BodiesDelta {
-        x: e_x.into(),
-        y: e_y.into(),
-        vx: e_vx,
-        vy: e_vy,
+        x: f_x.into(),
+        y: f_y.into(),
+        vx: p_x,
+        vy: p_y,
     }
 }
 
@@ -276,7 +273,7 @@ where
 {
     let mut oe = energy(bodies);
     for _ in 0..n {
-        bodies = rk4(bodies, &mut derivative, dt / n as i8);
+        bodies = rk4(bodies, &mut derivative, DT(dt.0 / f64::from(n)));
         let newe = energy(bodies);
         bodies = bodies + DT(newe - oe) * correct_energy(bodies);
         oe = newe;

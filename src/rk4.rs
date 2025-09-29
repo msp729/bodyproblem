@@ -18,22 +18,3 @@ where
     let d = dt / 8 * k;
     s + d
 }
-
-#[inline]
-pub fn rk4ntimes<State, Time, Derivative, Delta>(
-    mut s: State,
-    dv: &mut Derivative,
-    dt: Time,
-    n: usize,
-) -> State
-where
-    Delta: Copy + Neg<Output = Delta> + Mul<u8, Output = Delta> + Add<Delta, Output = Delta>,
-    State: Copy + Add<Delta, Output = State>,
-    Time: Copy + Mul<Delta, Output = Delta> + Div<i8, Output = Time>,
-    Derivative: FnMut(State) -> Delta,
-{
-    for _ in 0..n {
-        s = rk4(s, dv, dt);
-    }
-    s
-}

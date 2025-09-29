@@ -2,14 +2,11 @@ use std::simd::{LaneCount, Simd, SupportedLaneCount, num::SimdFloat};
 
 use opengl_graphics::GlGraphics;
 use piston::{
-    ButtonArgs, Input, Key,
+    Button, ButtonArgs, Input, Key,
     input::{RenderArgs, UpdateArgs},
 };
 
-use crate::{
-    rk4::{rk4, rk4ntimes},
-    sim::{Bodies, Body, DT, derivative, energy, superstep},
-};
+use crate::sim::{Bodies, Body, DT, energy, superstep};
 
 pub struct App<const N: usize>
 where
@@ -19,6 +16,7 @@ where
     pub(crate) sim: Bodies<N>,
     pub(crate) radii: Simd<f64, N>,
     pub(crate) scale: f64,
+    pub(crate) speed: f64,
 }
 
 const BG: [f32; 4] = [0.1, 0.1, 0.1, 0.0];
@@ -28,11 +26,10 @@ where
     LaneCount<N>: SupportedLaneCount,
 {
     pub fn render(&mut self, args: &RenderArgs) {
-        use graphics::*;
+        use graphics::{Transformed, clear, ellipse};
 
         let (x, y) = (args.window_size[0] / 2.0, args.window_size[1] / 2.0);
         let s = x.min(y);
-        let square = rectangle::square(-0.5, -0.5, 0.5);
 
         self.gl.draw(args.viewport(), |c, gl| {
             // Clear the screen.
@@ -43,10 +40,14 @@ where
             let maxdim = xmax.max(ymax) + self.radii.reduce_max();
             let s = s / maxdim;
 
-            let tr = c.transform.scale(s, -s).trans(x / s, -y / s);
+            let tr = c
+                .transform
+                .scale(s, -s)
+                .trans(x / s, -y / s)
+                .scale(self.scale, self.scale);
 
             for i in 0..N {
-                let Body { x, y, vx, vy, m } = self.sim.body(i);
+                let Body { x, y, .. } = self.sim.body(i);
 
                 let r = self.radii[i];
                 ellipse(
@@ -54,36 +55,40 @@ where
                     [x - r, y - r, 2.0 * r, 2.0 * r],
                     tr,
                     gl,
-                )
+                );
             }
         });
     }
 
-    pub fn update(&mut self, args: &UpdateArgs) {
-        self.sim = superstep(self.sim, DT(args.dt), 10);
-        let (x, y) = self.sim.com();
+    pub fn update(&mut self, args: UpdateArgs) {
+        self.sim = superstep(self.sim, DT(self.speed * args.dt), 10);
     }
 
-    pub fn handle(&mut self, inp: Input) {
-        match inp {
-            Input::Button(ba) => self.handle_button(ba),
-            _ => (),
+    pub fn handle(&mut self, inp: &Input) {
+        if let Input::Button(ba) = inp {
+            self.handle_button(ba);
         }
     }
 
-    fn handle_button(&mut self, ba: ButtonArgs) {
+    fn handle_button(&mut self, ba: &ButtonArgs) {
+        use Button::Keyboard;
+
         let ButtonArgs {
             state,
             button,
-            scancode,
+            scancode: _,
         } = ba;
+
         match (button, state) {
-            (piston::Button::Keyboard(Key::Space), piston::ButtonState::Press) => self.show(),
-            // angular momentum L = ωmr² = vmr = m(v cross r)
+            (Keyboard(Key::Space), piston::ButtonState::Press) => self.speed = 1.0 - self.speed,
+            (Keyboard(Key::Return), piston::ButtonState::Press) => self.show(),
+            (Keyboard(Key::Plus), piston::ButtonState::Press) => self.scale *= 2.0,
+            (Keyboard(Key::Minus), piston::ButtonState::Press) => self.scale /= 2.0,
             _ => (),
         }
     }
 
+    #[allow(clippy::similar_names)]
     fn show(&self) {
         let (x, y) = self.sim.com();
         let e = energy(self.sim);
@@ -93,8 +98,13 @@ where
         let amu = self.sim.tam(0.0, 1.0);
         let amd = self.sim.tam(0.0, -1.0);
         println!(
-            "E={:+.8}\tx=({:+.4},{:+.4})\tL:0={:+.4}, l={:+.4}, r={:+.4}, u={:+.4}, d={:+.4}",
-            e, x, y, am0, aml, amr, amu, amd
+            "E={e:+.8}\t\
+            x=({x:+.4},{y:+.4})\t\
+            L:0={am0:+.4},\
+            l={aml:+.4},\
+            r={amr:+.4},\
+            u={amu:+.4},\
+            d={amd:+.4}"
         );
     }
 }
